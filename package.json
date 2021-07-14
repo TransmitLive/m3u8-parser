@@ -96,5 +96,8 @@
   "lint-staged": {
     "*.js": "vjsstandard --fix",
     "README.md": "doctoc --notitle"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   }
 }
