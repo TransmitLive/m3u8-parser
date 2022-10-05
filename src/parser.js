@@ -137,6 +137,10 @@ export default class Parser extends Stream {
     let lastPartByterangeEnd = 0;
     const dateRangeTags = {};
 
+    // track where next segment starts
+    let nextSegmentLineNumberStart = 0;
+
+
     this.on('end', () => {
       // only add preloadSegment if we don't yet have a uri for it.
       // and we actually have parts/preloadHints
@@ -162,6 +166,11 @@ export default class Parser extends Stream {
     this.parseStream.on('data', function(entry) {
       let mediaGroup;
       let rendition;
+
+      //starting a new segment
+      if (!Object.keys(currentUri).length) {
+        nextSegmentLineNumberStart = this.lineStream.lineNumber;
+      }
 
       ({
         tag() {
@@ -735,6 +744,8 @@ export default class Parser extends Stream {
         },
         uri() {
           currentUri.uri = entry.uri;
+          currentUri.lineNumberStart = nextSegmentLineNumberStart;
+          currentUri.lineNumberEnd = this.lineStream.lineNumber;
           uris.push(currentUri);
 
           // if no explicit duration was declared, use the target duration
