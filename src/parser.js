@@ -25,7 +25,7 @@ const camelCaseKeys = function(attributes) {
 // partTargetDuration being set, but they may not be if SERVER-CONTROL appears before
 // target durations are set.
 const setHoldBack = function(manifest) {
-  const {serverControl, targetDuration, partTargetDuration} = manifest;
+  const { serverControl, targetDuration, partTargetDuration } = manifest;
 
   if (!serverControl) {
     return;
@@ -107,7 +107,7 @@ export default class Parser extends Stream {
     // if specified, the active decryption key
     let key;
     let hasParts = false;
-    const noop = function() {};
+    const noop = function() { };
     const defaultMediaGroups = {
       'AUDIO': {},
       'VIDEO': {},
@@ -132,6 +132,9 @@ export default class Parser extends Stream {
     let lastByterangeEnd = 0;
     // keep track of the last seen part's byte range end.
     let lastPartByterangeEnd = 0;
+
+    // track where next segment starts
+    let nextSegmentLineNumberStart = 0;
 
     this.on('end', () => {
       // only add preloadSegment if we don't yet have a uri for it.
@@ -158,6 +161,11 @@ export default class Parser extends Stream {
     this.parseStream.on('data', function(entry) {
       let mediaGroup;
       let rendition;
+
+      // starting a new segment
+      if (!Object.keys(currentUri).length) {
+        nextSegmentLineNumberStart = this.lineNumber;
+      }
 
       ({
         tag() {
@@ -400,9 +408,9 @@ export default class Parser extends Stream {
                 this.manifest.mediaGroups || defaultMediaGroups;
 
               if (!(entry.attributes &&
-                    entry.attributes.TYPE &&
-                    entry.attributes['GROUP-ID'] &&
-                    entry.attributes.NAME)) {
+                entry.attributes.TYPE &&
+                entry.attributes['GROUP-ID'] &&
+                entry.attributes.NAME)) {
                 this.trigger('warn', {
                   message: 'ignoring incomplete or missing media group'
                 });
@@ -636,6 +644,8 @@ export default class Parser extends Stream {
         },
         uri() {
           currentUri.uri = entry.uri;
+          currentUri.lineNumberStart = nextSegmentLineNumberStart;
+          currentUri.lineNumberEnd = this.parseStream.lineNumber;
           uris.push(currentUri);
 
           // if no explicit duration was declared, use the target duration
@@ -669,7 +679,7 @@ export default class Parser extends Stream {
           if (entry.segment) {
             currentUri.custom = currentUri.custom || {};
             currentUri.custom[entry.customType] = entry.data;
-          // if this is manifest-level data attach to the top level manifest object
+            // if this is manifest-level data attach to the top level manifest object
           } else {
             this.manifest.custom = this.manifest.custom || {};
             this.manifest.custom[entry.customType] = entry.data;
@@ -689,7 +699,7 @@ export default class Parser extends Stream {
     });
 
     if (missing.length) {
-      this.trigger('warn', {message: `${identifier} lacks required attribute(s): ${missing.join(', ')}`});
+      this.trigger('warn', { message: `${identifier} lacks required attribute(s): ${missing.join(', ')}` });
     }
   }
 
