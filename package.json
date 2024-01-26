@@ -1,6 +1,6 @@
 {
   "name": "@transmitlive/m3u8-parser",
-  "version": "4.7.2-beta.5",
+  "version": "4.7.2-beta.6",
   "description": "m3u8 parser",
   "main": "dist/m3u8-parser.cjs.js",
   "module": "dist/m3u8-parser.es.js",
