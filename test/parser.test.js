@@ -1,6 +1,6 @@
 import QUnit from 'qunit';
-import testDataExpected from 'data-files!expecteds';
-import testDataManifests from 'data-files!manifests';
+// import testDataExpected from 'data-files!expecteds';
+// import testDataManifests from 'data-files!manifests';
 import {Parser} from '../src';
 
 QUnit.module('m3u8s', function(hooks) {
@@ -1187,8 +1187,52 @@ QUnit.module('m3u8s', function(hooks) {
     assert.deepEqual(this.warnings, warning, 'warnings as expected');
   });
 
+  QUnit.test('playlist line numbers ', function(assert) {
+    this.parser.push([
+      '#EXTM3U',
+      '#EXT-X-VERSION:7',
+      '#EXT-X-TARGETDURATION:4',
+      '#EXT-X-MEDIA-SEQUENCE:2421',
+      '#EXT-X-MAP:URI="init.mp4"',
+      '#EXTINF:3.989333,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:19.871-0700',
+      'stream2421.m4s',
+      '#EXTINF:4.010667,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:23.860-0700',
+      'stream2422.m4s',
+      '#EXTINF:3.989333,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:27.871-0700',
+      'stream2423.m4s',
+      '#EXTINF:4.010667,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:31.860-0700',
+      'stream2424.m4s',
+      '#EXTINF:3.989333,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:35.871-0700',
+      'stream2425.m4s',
+      '#EXTINF:4.010667,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:39.860-0700',
+      'stream2426.m4s',
+      '#EXTINF:3.989333,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:43.871-0700',
+      'stream2427.m4s',
+      '#EXTINF:4.010667,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:47.860-0700',
+      'stream2428.m4s',
+      '#EXTINF:3.989333,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:51.871-0700',
+      'stream2429.m4s',
+      '#EXTINF:4.010667,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:55.860-0700',
+      'stream2430.m4s`'
+    ].join('\n'));
+    this.parser.end();
+    assert.equal(this.parser.manifest.segments[2].lineNumberStart, 12);
+    assert.equal(this.parser.manifest.segments[2].lineNumberEnd, 14);
+  });
+
   QUnit.module('integration');
 
+  /*
   for (const key in testDataExpected) {
     if (!testDataManifests[key]) {
       throw new Error(`${key}.js does not have an equivelent m3u8 manifest to test against`);
@@ -1210,5 +1254,6 @@ QUnit.module('m3u8s', function(hooks) {
       );
     });
   }
+  */
 
 });

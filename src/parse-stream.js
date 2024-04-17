@@ -100,6 +100,7 @@ export default class ParseStream extends Stream {
     super();
     this.customParsers = [];
     this.tagMappers = [];
+    this.lineNumber = 0;
   }
 
   /**
@@ -111,6 +112,7 @@ export default class ParseStream extends Stream {
     let match;
     let event;
 
+    this.lineNumber = this.lineNumber + 1;
     // strip whitespace
     line = line.trim();
 

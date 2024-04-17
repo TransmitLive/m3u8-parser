@@ -14,7 +14,6 @@ export default class LineStream extends Stream {
   constructor() {
     super();
     this.buffer = '';
-    this.lineNumber = 0;
   }
 
   /**
@@ -26,7 +25,6 @@ export default class LineStream extends Stream {
     let nextNewline;
 
     this.buffer += data;
-    this.lineNumber += 1;
     nextNewline = this.buffer.indexOf('\n');
 
     for (; nextNewline > -1; nextNewline = this.buffer.indexOf('\n')) {
