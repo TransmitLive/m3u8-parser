@@ -1242,6 +1242,61 @@ QUnit.module('m3u8s', function(hooks) {
     assert.equal(this.parser.manifest.segments[2].lineNumberEnd, 14);
   });
 
+  QUnit.test('playlist line numbers with keys', function(assert) {
+    this.parser.push([
+      '#EXTM3U',
+      '#EXT-X-VERSION:7',
+      '#EXT-X-TARGETDURATION:4',
+      '#EXT-X-MEDIA-SEQUENCE:2421',
+      '#EXT-X-MAP:URI="init.mp4"',
+      '#EXT-X-KEY:METHOD=AES-128,URI="95ef62ce-10b7-4a2f-b0b7-e281433a6548_1_1713380084.key",IV=0x0B94CC6BC3269D8AC967F6E0BA6ABACC',
+      '#EXTINF:3.989333,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:19.871-0700',
+      'stream2421.m4s',
+      '#EXT-X-KEY:METHOD=AES-128,URI="95ef62ce-10b7-4a2f-b0b7-e281433a6548_1_1713380084.key",IV=0x0B94CC6BC3269D8AC967F6E0BA6ABACC',
+      '#EXTINF:4.010667,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:23.860-0700',
+      'stream2422.m4s',
+      '#EXT-X-KEY:METHOD=AES-128,URI="95ef62ce-10b7-4a2f-b0b7-e281433a6548_1_1713380084.key",IV=0x0B94CC6BC3269D8AC967F6E0BA6ABACC',
+      '#EXTINF:3.989333,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:27.871-0700',
+      'stream2423.m4s',
+      '#EXT-X-KEY:METHOD=AES-128,URI="95ef62ce-10b7-4a2f-b0b7-e281433a6548_1_1713380084.key",IV=0x0B94CC6BC3269D8AC967F6E0BA6ABACC',
+      '#EXTINF:4.010667,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:31.860-0700',
+      'stream2424.m4s',
+      '#EXT-X-KEY:METHOD=AES-128,URI="95ef62ce-10b7-4a2f-b0b7-e281433a6548_1_1713380084.key",IV=0x0B94CC6BC3269D8AC967F6E0BA6ABACC',
+      '#EXTINF:3.989333,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:35.871-0700',
+      'stream2425.m4s',
+      '#EXT-X-KEY:METHOD=AES-128,URI="95ef62ce-10b7-4a2f-b0b7-e281433a6548_1_1713380084.key",IV=0x0B94CC6BC3269D8AC967F6E0BA6ABACC',
+      '#EXTINF:4.010667,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:39.860-0700',
+      'stream2426.m4s',
+      '#EXT-X-KEY:METHOD=AES-128,URI="95ef62ce-10b7-4a2f-b0b7-e281433a6548_1_1713380084.key",IV=0x0B94CC6BC3269D8AC967F6E0BA6ABACC',
+      '#EXTINF:3.989333,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:43.871-0700',
+      'stream2427.m4s',
+      '#EXT-X-KEY:METHOD=AES-128,URI="95ef62ce-10b7-4a2f-b0b7-e281433a6548_1_1713380084.key",IV=0x0B94CC6BC3269D8AC967F6E0BA6ABACC',
+      '#EXTINF:4.010667,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:47.860-0700',
+      'stream2428.m4s',
+      '#EXT-X-KEY:METHOD=AES-128,URI="95ef62ce-10b7-4a2f-b0b7-e281433a6548_1_1713380084.key",IV=0x0B94CC6BC3269D8AC967F6E0BA6ABACC',
+      '#EXTINF:3.989333,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:51.871-0700',
+      'stream2429.m4s',
+      '#EXT-X-KEY:METHOD=AES-128,URI="95ef62ce-10b7-4a2f-b0b7-e281433a6548_1_1713380084.key",IV=0x0B94CC6BC3269D8AC967F6E0BA6ABACC',
+      '#EXTINF:4.010667,',
+      '#EXT-X-PROGRAM-DATE-TIME:2024-04-17T09:43:55.860-0700',
+      'stream2430.m4s`'
+    ].join('\n'));
+    this.parser.end();
+    assert.equal(this.parser.manifest.segments[0].lineNumberStart, 6);
+    assert.equal(this.parser.manifest.segments[0].lineNumberEnd, 9);
+    assert.equal(this.parser.manifest.segments[2].lineNumberStart, 14);
+    assert.equal(this.parser.manifest.segments[2].lineNumberEnd, 17);
+  });
+
   QUnit.module('integration');
 
   /*

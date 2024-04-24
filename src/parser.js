@@ -139,6 +139,7 @@ export default class Parser extends Stream {
 
     // track where next segment starts
     let nextSegmentLineNumberStart = 0;
+    let lastKeyLineNumber = 0;
 
     this.on('end', () => {
       // only add preloadSegment if we don't yet have a uri for it.
@@ -169,6 +170,9 @@ export default class Parser extends Stream {
       // starting a new segment
       if (!Object.keys(currentUri).length) {
         nextSegmentLineNumberStart = this.lineNumber;
+        if (nextSegmentLineNumberStart - 1 === lastKeyLineNumber) {
+          nextSegmentLineNumberStart = lastKeyLineNumber;
+        }
       }
 
       ({
@@ -257,6 +261,7 @@ export default class Parser extends Stream {
                 });
                 return;
               }
+              lastKeyLineNumber = this.parseStream.lineNumber;
               // clear the active encryption key
               if (entry.attributes.METHOD === 'NONE') {
                 key = null;
