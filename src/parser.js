@@ -280,25 +280,15 @@ export default class Parser extends Stream {
                 return;
               }
 
-              if (entry.attributes.KEYFORMAT === 'com.microsoft.playready') {
-                this.manifest.contentProtection = this.manifest.contentProtection || {};
-
-                // TODO: add full support for this.
-                this.manifest.contentProtection['com.microsoft.playready'] = {
-                  uri: entry.attributes.URI
-                };
-
-                return;
-              }
-
-              // check if the content is encrypted for Widevine
+              // check if the content is encrypted for Widevine or Playready
               // Widevine/HLS spec: https://storage.googleapis.com/wvdocs/Widevine_DRM_HLS.pdf
-              if (entry.attributes.KEYFORMAT === widevineUuid) {
+              if (entry.attributes.KEYFORMAT === widevineUuid || entry.attributes.KEYFORMAT === 'com.microsoft.playready') {
+                const protectionSystem = entry.attributes.KEYFORMAT === widevineUuid ? 'com.widevine.alpha' : 'com.microsoft.playready';
                 const VALID_METHODS = ['SAMPLE-AES', 'SAMPLE-AES-CTR', 'SAMPLE-AES-CENC'];
 
                 if (VALID_METHODS.indexOf(entry.attributes.METHOD) === -1) {
                   this.trigger('warn', {
-                    message: 'invalid key method provided for Widevine'
+                    message: `invalid key method provided for ${protectionSystem}`
                   });
                   return;
                 }
@@ -311,30 +301,33 @@ export default class Parser extends Stream {
 
                 if (entry.attributes.URI.substring(0, 23) !== 'data:text/plain;base64,') {
                   this.trigger('warn', {
-                    message: 'invalid key URI provided for Widevine'
+                    message: `invalid key URI provided for ${protectionSystem}`
                   });
                   return;
                 }
 
                 if (!(entry.attributes.KEYID && entry.attributes.KEYID.substring(0, 2) === '0x')) {
                   this.trigger('warn', {
-                    message: 'invalid key ID provided for Widevine'
+                    message: `invalid key ID provided for ${protectionSystem}`
                   });
                   return;
                 }
 
-                // if Widevine key attributes are valid, store them as `contentProtection`
-                // on the manifest to emulate Widevine tag structure in a DASH mpd
+                // if key attributes are valid, store them as `contentProtection`
+                // on the manifest to emulate tag structure in a DASH mpd
                 this.manifest.contentProtection = this.manifest.contentProtection || {};
-                this.manifest.contentProtection['com.widevine.alpha'] = {
+                this.manifest.contentProtection[protectionSystem] = {
                   attributes: {
                     schemeIdUri: entry.attributes.KEYFORMAT,
                     // remove '0x' from the key id string
-                    keyId: entry.attributes.KEYID.substring(2)
+                    keyId: entry.attributes.KEYID.substring(2),
+                    method: entry.attributes.METHOD,
+                    iv: entry.attributes.IV
                   },
                   // decode the base64-encoded PSSH box
                   pssh: decodeB64ToUint8Array(entry.attributes.URI.split(',')[1])
                 };
+
                 return;
               }
 

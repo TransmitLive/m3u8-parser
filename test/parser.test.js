@@ -843,7 +843,7 @@ QUnit.module('m3u8s', function(hooks) {
       '#EXT-X-SERVER-CONTROL:foo=bar',
       '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="data:text/plain;base64,foo",KEYID=0x555777,IV=1234567890abcdef1234567890abcdef,KEYFORMATVERSIONS="1",KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"',
       '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="skd://foo",KEYFORMATVERSIONS="1",KEYFORMAT="com.apple.streamingkeydelivery"',
-      '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="http://example.com",KEYFORMATVERSIONS="1",KEYFORMAT="com.microsoft.playready"',
+      '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="data:text/plain;base64,bar",KEYFORMATVERSIONS="1",KEYFORMAT="com.microsoft.playready",KEYID=0x555777',
       '#EXTINF:10,',
       'media-00001.ts',
       '#EXT-X-ENDLIST'
