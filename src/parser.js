@@ -322,7 +322,8 @@ export default class Parser extends Stream {
                     // remove '0x' from the key id string
                     keyId: entry.attributes.KEYID.substring(2),
                     method: entry.attributes.METHOD,
-                    iv: entry.attributes.IV
+                    iv: entry.attributes.IV,
+                    ivHex: entry.attributes.IVHex
                   },
                   // decode the base64-encoded PSSH box
                   pssh: decodeB64ToUint8Array(entry.attributes.URI.split(',')[1])
