@@ -369,6 +369,7 @@ export default class ParseStream extends Stream {
               event.attributes.IV = event.attributes.IV.substring(2);
             }
 
+            event.attributes.IVHex = event.attributes.IV;
             event.attributes.IV = event.attributes.IV.match(/.{8}/g);
             event.attributes.IV[0] = parseInt(event.attributes.IV[0], 16);
             event.attributes.IV[1] = parseInt(event.attributes.IV[1], 16);
