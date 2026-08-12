@@ -1,7 +1,7 @@
 import QUnit from 'qunit';
 // import testDataExpected from 'data-files!expecteds';
 // import testDataManifests from 'data-files!manifests';
-import {Parser} from '../src';
+import { Parser } from '../src';
 
 QUnit.module('m3u8s', function(hooks) {
   hooks.beforeEach(function() {
@@ -846,6 +846,14 @@ QUnit.module('m3u8s', function(hooks) {
       '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="data:text/plain;base64,bar",KEYFORMATVERSIONS="1",KEYFORMAT="com.microsoft.playready",KEYID=0x555777',
       '#EXTINF:10,',
       'media-00001.ts',
+      '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="data:text/plain;base64,foo",KEYID=0x555888,IV=1234567890abcdef1234567890abcdef,KEYFORMATVERSIONS="1",KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"',
+      '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="skd://bar",KEYFORMATVERSIONS="1",KEYFORMAT="com.apple.streamingkeydelivery"',
+      '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="data:text/plain;base64,bar",KEYFORMATVERSIONS="1",KEYFORMAT="com.microsoft.playready",KEYID=0x555888',
+      '#EXTINF:10,',
+      'media-00002.ts',
+      '#EXT-X-KEY:METHOD=NONE',
+      '#EXTINF:10,',
+      'media-00003.ts',
       '#EXT-X-ENDLIST'
     ].join('\n'));
     this.parser.end();
@@ -854,6 +862,50 @@ QUnit.module('m3u8s', function(hooks) {
       Object.keys(this.parser.manifest.contentProtection),
       ['com.widevine.alpha', 'com.apple.fps.1_0', 'com.microsoft.playready'],
       'info as expected'
+    );
+    assert.deepEqual(
+      Object.keys(this.parser.manifest.segments[0].contentProtection),
+      ['com.widevine.alpha', 'com.apple.fps.1_0', 'com.microsoft.playready'],
+      'info as expected'
+    );
+    assert.deepEqual(
+      this.parser.manifest.segments[0].contentProtection['com.widevine.alpha'].attributes.keyId,
+      '555777',
+      'wv keyid as expected'
+    );
+    assert.deepEqual(
+      this.parser.manifest.segments[0].contentProtection['com.microsoft.playready'].attributes.keyId,
+      '555777',
+      'pr keyid as expected'
+    );
+    assert.deepEqual(
+      this.parser.manifest.segments[0].contentProtection['com.apple.fps.1_0'].attributes.URI,
+      'skd://foo',
+      'uri as expected'
+    );
+    assert.deepEqual(
+      Object.keys(this.parser.manifest.segments[1].contentProtection),
+      ['com.widevine.alpha', 'com.apple.fps.1_0', 'com.microsoft.playready'],
+      'info as expected'
+    );
+    assert.deepEqual(
+      this.parser.manifest.segments[1].contentProtection['com.widevine.alpha'].attributes.keyId,
+      '555888',
+      'wv keyid as expected'
+    );
+    assert.deepEqual(
+      this.parser.manifest.segments[1].contentProtection['com.microsoft.playready'].attributes.keyId,
+      '555888',
+      'pr keyid as expected'
+    );
+    assert.deepEqual(
+      this.parser.manifest.segments[1].contentProtection['com.apple.fps.1_0'].attributes.URI,
+      'skd://bar',
+      'uri as expected'
+    );
+    assert.notOk(
+      this.parser.manifest.segments[2].contentProtection,
+      'no info as expected'
     );
   });
 
