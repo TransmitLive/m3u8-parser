@@ -25,7 +25,7 @@ const camelCaseKeys = function(attributes) {
 // partTargetDuration being set, but they may not be if SERVER-CONTROL appears before
 // target durations are set.
 const setHoldBack = function(manifest) {
-  const {serverControl, targetDuration, partTargetDuration} = manifest;
+  const { serverControl, targetDuration, partTargetDuration } = manifest;
 
   if (!serverControl) {
     return;
@@ -108,6 +108,7 @@ export default class Parser extends Stream {
     let currentMap;
     // if specified, the active decryption key
     let key;
+    let contentProtection = null;
     let hasParts = false;
     const noop = function() {};
     const defaultMediaGroups = {
@@ -260,6 +261,7 @@ export default class Parser extends Stream {
               // clear the active encryption key
               if (entry.attributes.METHOD === 'NONE') {
                 key = null;
+                contentProtection = null;
                 return;
               }
               if (!entry.attributes.URI) {
@@ -270,13 +272,16 @@ export default class Parser extends Stream {
               }
 
               if (entry.attributes.KEYFORMAT === 'com.apple.streamingkeydelivery') {
-                this.manifest.contentProtection = this.manifest.contentProtection || {};
+                // first keytag or we've already seen a keytag for this key system, create a new content protection object
+                // otherwise add to the existing for multiple key systems
+                contentProtection = (contentProtection === null || contentProtection['com.apple.fps.1_0']) ? {} : contentProtection;
 
                 // TODO: add full support for this.
-                this.manifest.contentProtection['com.apple.fps.1_0'] = {
+                contentProtection['com.apple.fps.1_0'] = {
                   attributes: entry.attributes
                 };
 
+                this.manifest.contentProtection = contentProtection;
                 return;
               }
 
@@ -315,8 +320,10 @@ export default class Parser extends Stream {
 
                 // if key attributes are valid, store them as `contentProtection`
                 // on the manifest to emulate tag structure in a DASH mpd
-                this.manifest.contentProtection = this.manifest.contentProtection || {};
-                this.manifest.contentProtection[protectionSystem] = {
+                // first keytag or we've already seen a keytag for this key system, create a new content protection object
+                // otherwise add to the existing for multiple key systems
+                contentProtection = (contentProtection === null || contentProtection[protectionSystem]) ? {} : contentProtection;
+                contentProtection[protectionSystem] = {
                   attributes: {
                     schemeIdUri: entry.attributes.KEYFORMAT,
                     // remove '0x' from the key id string
@@ -329,6 +336,7 @@ export default class Parser extends Stream {
                   pssh: decodeB64ToUint8Array(entry.attributes.URI.split(',')[1])
                 };
 
+                this.manifest.contentProtection = contentProtection;
                 return;
               }
 
@@ -411,9 +419,9 @@ export default class Parser extends Stream {
                 this.manifest.mediaGroups || defaultMediaGroups;
 
               if (!(entry.attributes &&
-                    entry.attributes.TYPE &&
-                    entry.attributes['GROUP-ID'] &&
-                    entry.attributes.NAME)) {
+                entry.attributes.TYPE &&
+                entry.attributes['GROUP-ID'] &&
+                entry.attributes.NAME)) {
                 this.trigger('warn', {
                   message: 'ignoring incomplete or missing media group'
                 });
@@ -752,6 +760,9 @@ export default class Parser extends Stream {
           if (key) {
             currentUri.key = key;
           }
+          if (contentProtection) {
+            currentUri.contentProtection = contentProtection;
+          }
           currentUri.timeline = currentTimeline;
           // annotate with initialization segment information, if necessary
           if (currentMap) {
@@ -778,7 +789,7 @@ export default class Parser extends Stream {
           if (entry.segment) {
             currentUri.custom = currentUri.custom || {};
             currentUri.custom[entry.customType] = entry.data;
-          // if this is manifest-level data attach to the top level manifest object
+            // if this is manifest-level data attach to the top level manifest object
           } else {
             this.manifest.custom = this.manifest.custom || {};
             this.manifest.custom[entry.customType] = entry.data;
@@ -798,7 +809,7 @@ export default class Parser extends Stream {
     });
 
     if (missing.length) {
-      this.trigger('warn', {message: `${identifier} lacks required attribute(s): ${missing.join(', ')}`});
+      this.trigger('warn', { message: `${identifier} lacks required attribute(s): ${missing.join(', ')}` });
     }
   }
 
