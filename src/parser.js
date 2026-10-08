@@ -311,7 +311,8 @@ export default class Parser extends Stream {
                   return;
                 }
 
-                if (!(entry.attributes.KEYID && entry.attributes.KEYID.substring(0, 2) === '0x')) {
+                // KEYID is optional, but if it is provided, it must be a valid 0x-prefixed hexadecimal string
+                if (entry.attributes.KEYID && entry.attributes.KEYID.substring(0, 2) !== '0x') {
                   this.trigger('warn', {
                     message: `invalid key ID provided for ${protectionSystem}`
                   });
@@ -327,7 +328,7 @@ export default class Parser extends Stream {
                   attributes: {
                     schemeIdUri: entry.attributes.KEYFORMAT,
                     // remove '0x' from the key id string
-                    keyId: entry.attributes.KEYID.substring(2),
+                    keyId: entry.attributes.KEYID ? entry.attributes.KEYID.substring(2) : undefined,
                     method: entry.attributes.METHOD,
                     iv: entry.attributes.IV,
                     ivHex: entry.attributes.IVHex

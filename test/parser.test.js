@@ -311,6 +311,37 @@ QUnit.module('m3u8s', function(hooks) {
     assert.notOk(this.parser.manifest.contentProtection, 'contentProtection not added');
   });
 
+  QUnit.test('Widevine #EXT-X-KEY KEYID attribute is not required', function(assert) {
+    const manifest = [
+      '#EXTM3U',
+      '#EXT-X-KEY:METHOD=SAMPLE-AES-CTR,' +
+      'URI="data:text/plain;base64,AAAAPnBzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAAB4iFnN' +
+      'oYWthX2NlYzJmNjRhYTc4OTBhMTFI49yVmwY=",' +
+      'KEYFORMATVERSIONS="1",KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"',
+      '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="data:text/plain;base64,bar",KEYFORMATVERSIONS="1",KEYFORMAT="com.microsoft.playready"',
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.ok(this.parser.manifest.contentProtection, 'contentProtection added');
+    assert.deepEqual(
+      Object.keys(this.parser.manifest.contentProtection),
+      ['com.widevine.alpha', 'com.microsoft.playready'],
+      'contentProtection keys as expected'
+    );
+    assert.deepEqual(
+      Object.keys(this.parser.manifest.segments[0].contentProtection),
+      ['com.widevine.alpha', 'com.microsoft.playready'],
+      'segments[0].contentProtection keys as expected'
+    );
+    assert.notOk(this.parser.manifest.segments[0].contentProtection['com.widevine.alpha'].attributes.keyId);
+    assert.notOk(this.parser.manifest.segments[0].contentProtection['com.microsoft.playready'].attributes.keyId);
+  });
+
   QUnit.test('Widevine #EXT-X-KEY attributes not attached to manifest if KEYFORMAT is not Widevine UUID', function(assert) {
     const manifest = [
       '#EXTM3U',
