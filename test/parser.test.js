@@ -2,6 +2,17 @@ import QUnit from 'qunit';
 // import testDataExpected from 'data-files!expecteds';
 // import testDataManifests from 'data-files!manifests';
 import { Parser } from '../src';
+import {
+  PLAYREADY_SYSTEM_ID,
+  WIDEVINE_SYSTEM_ID,
+  generateKey,
+  playReadyHeader,
+  playReadyKid,
+  playReadyObject,
+  psshBox,
+  toBase64,
+  widevinePsshData
+} from './helpers/drm';
 
 QUnit.module('m3u8s', function(hooks) {
   hooks.beforeEach(function() {
@@ -327,6 +338,187 @@ QUnit.module('m3u8s', function(hooks) {
     this.parser.end();
 
     assert.notOk(this.parser.manifest.contentProtection, 'contentProtection not added');
+  });
+
+  QUnit.test('Widevine #EXT-X-KEY attributes attached if KEYID found in PSSH data', function(assert) {
+    const { keyId, keyIdHex, ivHex } = generateKey();
+    const pssh = psshBox({ systemId: WIDEVINE_SYSTEM_ID, data: widevinePsshData(keyId) });
+    const manifest = [
+      '#EXTM3U',
+      `#EXT-X-KEY:METHOD=SAMPLE-AES,KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed",KEYFORMATVERSIONS="1",URI="data:text/plain;base64,${toBase64(pssh)}",IV=0x${ivHex}`,
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.ok(this.parser.manifest.contentProtection, 'contentProtection property added');
+    assert.equal(
+      this.parser.manifest.contentProtection['com.widevine.alpha'].attributes.keyId,
+      keyIdHex,
+      'keyId extracted from PSSH data'
+    );
+    assert.equal(
+      this.parser.manifest.contentProtection['com.widevine.alpha'].attributes.ivHex,
+      ivHex,
+      'IV set correctly'
+    );
+  });
+
+  QUnit.test('PlayReady #EXT-X-KEY attributes attached if KID found in PlayReady Object', function(assert) {
+    const { keyId, keyIdHex, ivHex } = generateKey();
+    const pro = playReadyObject(playReadyHeader(playReadyKid(keyId), '4.3.0.0'));
+    const manifest = [
+      '#EXTM3U',
+      `#EXT-X-KEY:METHOD=SAMPLE-AES,KEYFORMAT="com.microsoft.playready",KEYFORMATVERSIONS="1",URI="data:text/plain;base64,${toBase64(pro)}",IV=0x${ivHex}`,
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.equal(
+      this.parser.manifest.contentProtection['com.microsoft.playready'].attributes.keyId,
+      keyIdHex,
+      'keyId extracted from PlayReady header v4.3 KID VALUE attribute'
+    );
+    assert.equal(
+      this.parser.manifest.contentProtection['com.microsoft.playready'].attributes.ivHex,
+      ivHex,
+      'IV set correctly'
+    );
+  });
+
+  QUnit.test('PlayReady #EXT-X-KEY attributes attached if KID found in PSSH data', function(assert) {
+    const { keyId, keyIdHex, ivHex } = generateKey();
+    const pssh = psshBox({
+      systemId: PLAYREADY_SYSTEM_ID,
+      data: playReadyObject(playReadyHeader(playReadyKid(keyId)))
+    });
+    const manifest = [
+      '#EXTM3U',
+      `#EXT-X-KEY:METHOD=SAMPLE-AES,KEYFORMAT="com.microsoft.playready",KEYFORMATVERSIONS="1",URI="data:text/plain;base64,${toBase64(pssh)}",IV=0x${ivHex}`,
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.equal(
+      this.parser.manifest.contentProtection['com.microsoft.playready'].attributes.keyId,
+      keyIdHex,
+      'keyId extracted from PlayReady header v4.0 KID element'
+    );
+    assert.equal(
+      this.parser.manifest.contentProtection['com.microsoft.playready'].attributes.ivHex,
+      ivHex,
+      'IV set correctly'
+    );
+  });
+
+  QUnit.test('PlayReady #EXT-X-KEY accepts a data URI with a charset parameter', function(assert) {
+    const { keyId, keyIdHex, ivHex } = generateKey();
+    const pro = playReadyObject(playReadyHeader(playReadyKid(keyId), '4.3.0.0'));
+    const manifest = [
+      '#EXTM3U',
+      `#EXT-X-KEY:METHOD=SAMPLE-AES,KEYFORMAT="com.microsoft.playready",KEYFORMATVERSIONS="1",URI="data:text/plain;charset=UTF-16;base64,${toBase64(pro)}",IV=0x${ivHex}`,
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.equal(
+      this.parser.manifest.contentProtection['com.microsoft.playready'].attributes.keyId,
+      keyIdHex,
+      'keyId extracted from charset=UTF-16 data URI'
+    );
+  });
+
+  QUnit.test('#EXT-X-KEY with invalid base64 URI warns instead of throwing', function(assert) {
+    const { ivHex } = generateKey();
+    const warnings = [];
+    const manifest = [
+      '#EXTM3U',
+      `#EXT-X-KEY:METHOD=SAMPLE-AES,KEYFORMAT="com.microsoft.playready",KEYFORMATVERSIONS="1",URI="data:text/plain;base64,***",IV=0x${ivHex}`,
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.on('warn', (warning) => warnings.push(warning.message));
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.notOk(this.parser.manifest.contentProtection, 'contentProtection not added');
+    assert.ok(warnings.length, 'warning triggered');
+  });
+
+  QUnit.test('PlayReady #EXT-X-KEY with malformed KID in PlayReady Object warns', function(assert) {
+    const { ivHex } = generateKey();
+    const warnings = [];
+    const pro = playReadyObject(playReadyHeader('***'));
+    const manifest = [
+      '#EXTM3U',
+      `#EXT-X-KEY:METHOD=SAMPLE-AES,KEYFORMAT="com.microsoft.playready",KEYFORMATVERSIONS="1",URI="data:text/plain;base64,${toBase64(pro)}",IV=0x${ivHex}`,
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.on('warn', (warning) => warnings.push(warning.message));
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.notOk(this.parser.manifest.contentProtection, 'contentProtection not added');
+    assert.deepEqual(warnings, ['invalid key ID provided for com.microsoft.playready'], 'key ID warning triggered');
+  });
+
+  QUnit.test('Widevine #EXT-X-KEY does not read a bare PlayReady Object', function(assert) {
+    const { keyId, ivHex } = generateKey();
+    const pro = playReadyObject(playReadyHeader(playReadyKid(keyId)));
+    const manifest = [
+      '#EXTM3U',
+      `#EXT-X-KEY:METHOD=SAMPLE-AES,KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed",KEYFORMATVERSIONS="1",URI="data:text/plain;base64,${toBase64(pro)}",IV=0x${ivHex}`,
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.notOk(this.parser.manifest.contentProtection, 'contentProtection not added');
+  });
+
+  QUnit.test('#EXT-X-KEY KEYID attribute takes precedence over PSSH data and is uppercased', function(assert) {
+    const psshKey = generateKey();
+    const { keyIdHex, ivHex } = generateKey();
+    const pssh = psshBox({ systemId: WIDEVINE_SYSTEM_ID, data: widevinePsshData(psshKey.keyId) });
+    const manifest = [
+      '#EXTM3U',
+      `#EXT-X-KEY:METHOD=SAMPLE-AES,KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed",KEYFORMATVERSIONS="1",URI="data:text/plain;base64,${toBase64(pssh)}",KEYID=0x${keyIdHex.toLowerCase()},IV=0x${ivHex}`,
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.equal(
+      this.parser.manifest.contentProtection['com.widevine.alpha'].attributes.keyId,
+      keyIdHex,
+      'keyId taken from KEYID attribute'
+    );
   });
 
   QUnit.test('byterange offset defaults to next byte', function(assert) {
