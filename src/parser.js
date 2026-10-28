@@ -5,6 +5,7 @@ import Stream from '@videojs/vhs-utils/es/stream.js';
 import decodeB64ToUint8Array from '@videojs/vhs-utils/es/decode-b64-to-uint8-array.js';
 import LineStream from './line-stream';
 import ParseStream from './parse-stream';
+import { getKeyIdFromPssh } from './pssh';
 
 const camelCase = (str) => str
   .toLowerCase()
@@ -304,14 +305,33 @@ export default class Parser extends Stream {
                   });
                 }
 
-                if (entry.attributes.URI.substring(0, 23) !== 'data:text/plain;base64,') {
+                if (!(/^data:text\/plain(;[^;,=]+=[^;,]+)*;base64,/i).test(entry.attributes.URI)) {
                   this.trigger('warn', {
                     message: `invalid key URI provided for ${protectionSystem}`
                   });
                   return;
                 }
 
-                if (!(entry.attributes.KEYID && entry.attributes.KEYID.substring(0, 2) === '0x')) {
+                let pssh;
+                let keyID = entry.attributes.KEYID;
+
+                try {
+                  // decode the base64-encoded PSSH box
+                  pssh = decodeB64ToUint8Array(entry.attributes.URI.split(',')[1]);
+                } catch (e) {
+                  this.trigger('warn', {
+                    message: `invalid key URI provided for ${protectionSystem}`
+                  });
+                  return;
+                }
+
+                if (!keyID) {
+                  const psshKeyId = getKeyIdFromPssh(pssh, protectionSystem);
+
+                  keyID = psshKeyId && '0x' + psshKeyId;
+                }
+
+                if (!(keyID && keyID.substring(0, 2) === '0x')) {
                   this.trigger('warn', {
                     message: `invalid key ID provided for ${protectionSystem}`
                   });
@@ -327,13 +347,12 @@ export default class Parser extends Stream {
                   attributes: {
                     schemeIdUri: entry.attributes.KEYFORMAT,
                     // remove '0x' from the key id string
-                    keyId: entry.attributes.KEYID.substring(2),
+                    keyId: keyID.substring(2).toUpperCase(),
                     method: entry.attributes.METHOD,
                     iv: entry.attributes.IV,
                     ivHex: entry.attributes.IVHex
                   },
-                  // decode the base64-encoded PSSH box
-                  pssh: decodeB64ToUint8Array(entry.attributes.URI.split(',')[1])
+                  pssh
                 };
 
                 this.manifest.contentProtection = contentProtection;
