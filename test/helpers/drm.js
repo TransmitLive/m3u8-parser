@@ -41,7 +41,7 @@ export const toHex = (bytes) => Array.prototype.map.call(bytes, (b) => ('0' + b.
 
 export const fromHex = (hex) => new Uint8Array(hex.match(/../g).map((b) => parseInt(b, 16)));
 
-export const toBase64 = (bytes) => window.btoa(String.fromCharCode.apply(null, bytes));
+export const toBase64 = (bytes) => Buffer.from(String.fromCharCode.apply(null, bytes), 'binary').toString('base64');
 
 /**
  * Generate a key ID and IV for a test.
