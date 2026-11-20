@@ -13,6 +13,19 @@ const PLAYREADY_SYSTEM_ID = '9A04F07998404286AB92E65BE0885F95';
 
 const toHex = (bytes) => toHexString(bytes).toUpperCase();
 
+const unique = (values) => values.filter((value, i) => values.indexOf(value) === i);
+
+const matchAll = function(str, regex) {
+  const values = [];
+  let match;
+
+  while ((match = regex.exec(str))) {
+    values.push(match[1]);
+  }
+
+  return values;
+};
+
 const decodeUtf16le = function(bytes) {
   if (window.TextDecoder) {
     return new window.TextDecoder('utf-16le').decode(bytes);
@@ -28,12 +41,13 @@ const decodeUtf16le = function(bytes) {
 };
 
 /**
- * Read the `key_id` (field 2) from WidevinePsshData protobuf bytes.
+ * Read the `key_id` entries (field 2) from WidevinePsshData protobuf bytes.
  *
  * @param {Uint8Array} data the WidevinePsshData bytes
- * @return {string|undefined} the key ID as an uppercase hex string
+ * @return {string[]} the key IDs as uppercase hex strings
  */
-const getWidevineKeyId = function(data) {
+const getWidevineKeyIds = function(data) {
+  const keyIds = [];
   let offset = 0;
 
   const readVarint = () => {
@@ -65,17 +79,19 @@ const getWidevineKeyId = function(data) {
       const length = readVarint();
 
       if (field === 2 && length === 16 && offset + 16 <= data.length) {
-        return toHex(data.subarray(offset, offset + 16));
+        keyIds.push(toHex(data.subarray(offset, offset + 16)));
       }
       offset += length;
     } else {
-      return;
+      break;
     }
   }
+
+  return keyIds;
 };
 
 /**
- * Read the first KID from a PlayReady Object's PlayReady Header record.
+ * Read the KIDs from a PlayReady Object's PlayReady Header record.
  *
  * Supports both `<KID>base64</KID>` (header v4.0) and
  * `<KID VALUE="base64" ...>` (header v4.1+). PlayReady stores KIDs as
@@ -83,11 +99,11 @@ const getWidevineKeyId = function(data) {
  * the same big-endian form used by Widevine and CENC.
  *
  * @param {Uint8Array} data the PlayReady Object bytes
- * @return {string|undefined} the key ID as an uppercase hex string
+ * @return {string[]} the key IDs as uppercase hex strings
  */
-const getPlayReadyKeyId = function(data) {
+const getPlayReadyKeyIds = function(data) {
   if (data.length < 6) {
-    return;
+    return [];
   }
 
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -103,35 +119,39 @@ const getPlayReadyKeyId = function(data) {
 
     if (type === 1) {
       const xml = decodeUtf16le(data.subarray(offset, end));
-      const match = (/<KID\s[^>]*VALUE="([^"]+)"/i).exec(xml) || (/<KID>([^<]+)<\/KID>/i).exec(xml);
+      let values = matchAll(xml, /<KID\s[^>]*VALUE="([^"]+)"/gi);
 
-      if (!match) {
-        return;
+      if (!values.length) {
+        values = matchAll(xml, /<KID>([^<]+)<\/KID>/gi);
       }
 
-      let kid;
+      return values.reduce((keyIds, value) => {
+        let kid;
 
-      try {
-        kid = decodeB64ToUint8Array(match[1].trim());
-      } catch (e) {
-        return;
-      }
+        try {
+          kid = decodeB64ToUint8Array(value.trim());
+        } catch (e) {
+          return keyIds;
+        }
 
-      if (kid.length !== 16) {
-        return;
-      }
+        if (kid.length === 16) {
+          keyIds.push(toHex([kid[3], kid[2], kid[1], kid[0], kid[5], kid[4], kid[7], kid[6]]) +
+            toHex(kid.subarray(8)));
+        }
 
-      return toHex([kid[3], kid[2], kid[1], kid[0], kid[5], kid[4], kid[7], kid[6]]) +
-        toHex(kid.subarray(8));
+        return keyIds;
+      }, []);
     }
 
     offset = end;
   }
+
+  return [];
 };
 
 /**
- * Extract the first key ID from a PSSH box, or from a bare PlayReady Object
- * when the key system is PlayReady.
+ * Extract the key IDs from a PSSH box, or from a bare PlayReady Object when
+ * the key system is PlayReady.
  *
  * Version 1 boxes list key IDs directly after the system ID. For version 0
  * boxes the key ID is read from the system specific data: the
@@ -141,15 +161,16 @@ const getPlayReadyKeyId = function(data) {
  * @param {Uint8Array} bytes the PSSH box (or PlayReady Object) bytes
  * @param {string} keySystem the key system the data belongs to, e.g.
  *        `com.widevine.alpha` or `com.microsoft.playready`
- * @return {string|undefined} the key ID as an uppercase hex string
+ * @return {string[]} the distinct key IDs as uppercase hex strings, in the
+ *         order they appear
  */
-export const getKeyIdFromPssh = function(bytes, keySystem) {
+export const getKeyIdsFromPssh = function(bytes, keySystem) {
   if (!bytes || bytes.length < 8) {
-    return;
+    return [];
   }
 
   if (String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]) !== 'pssh') {
-    return keySystem === 'com.microsoft.playready' ? getPlayReadyKeyId(bytes) : undefined;
+    return keySystem === 'com.microsoft.playready' ? unique(getPlayReadyKeyIds(bytes)) : [];
   }
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -159,7 +180,7 @@ export const getKeyIdFromPssh = function(bytes, keySystem) {
 
   if (size === 1) {
     if (bytes.length < 16) {
-      return;
+      return [];
     }
     boxEnd = Math.min(view.getUint32(8) * 0x100000000 + view.getUint32(12), bytes.length);
     offset = 16;
@@ -169,7 +190,7 @@ export const getKeyIdFromPssh = function(bytes, keySystem) {
 
   // full box header (4) + system ID (16) + KID count or data size (4)
   if (offset + 24 > boxEnd) {
-    return;
+    return [];
   }
 
   const version = bytes[offset];
@@ -182,22 +203,40 @@ export const getKeyIdFromPssh = function(bytes, keySystem) {
 
     offset += 4;
     if (kidCount > 0) {
-      return offset + 16 <= boxEnd ? toHex(bytes.subarray(offset, offset + 16)) : undefined;
+      const keyIds = [];
+
+      for (let i = 0; i < kidCount && offset + 16 <= boxEnd; i++, offset += 16) {
+        keyIds.push(toHex(bytes.subarray(offset, offset + 16)));
+      }
+
+      return unique(keyIds);
     }
   }
 
   if (offset + 4 > boxEnd) {
-    return;
+    return [];
   }
 
   const dataEnd = Math.min(offset + 4 + view.getUint32(offset), boxEnd);
   const data = bytes.subarray(offset + 4, dataEnd);
 
   if (systemId === WIDEVINE_SYSTEM_ID) {
-    return getWidevineKeyId(data);
+    return unique(getWidevineKeyIds(data));
   }
 
   if (systemId === PLAYREADY_SYSTEM_ID) {
-    return getPlayReadyKeyId(data);
+    return unique(getPlayReadyKeyIds(data));
   }
+
+  return [];
 };
+
+/**
+ * Extract the first key ID from a PSSH box, or from a bare PlayReady Object
+ * when the key system is PlayReady.
+ *
+ * @param {Uint8Array} bytes the PSSH box (or PlayReady Object) bytes
+ * @param {string} keySystem the key system the data belongs to
+ * @return {string|undefined} the key ID as an uppercase hex string
+ */
+export const getKeyIdFromPssh = (bytes, keySystem) => getKeyIdsFromPssh(bytes, keySystem)[0];

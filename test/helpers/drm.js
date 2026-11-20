@@ -2,8 +2,6 @@
  * Helpers for building DRM initialization data (PSSH boxes, WidevinePsshData
  * and PlayReady Objects) with freshly generated key IDs inside tests.
  */
-import window from 'global/window';
-
 export const WIDEVINE_SYSTEM_ID = 'EDEF8BA979D64ACEA3C827DCD51D21ED';
 export const PLAYREADY_SYSTEM_ID = '9A04F07998404286AB92E65BE0885F95';
 
@@ -62,19 +60,23 @@ export const generateKey = () => {
  * Build WidevinePsshData protobuf bytes. A varint and a provider string are
  * written ahead of `key_id` so parsing has to skip other fields.
  *
- * @param {Uint8Array} keyId the 16 byte key ID
+ * @param {Uint8Array|Uint8Array[]} keyIds one or more 16 byte key IDs
  * @return {Uint8Array} the protobuf bytes
  */
-export const widevinePsshData = (keyId) => concat(
-  // algorithm = AESCTR
-  [0x08, 0x01],
-  // provider
-  [0x1a, 0x07], ascii('testing'),
-  // key_id
-  [0x12, 0x10], keyId,
-  // content_id
-  [0x22, 0x10], keyId
-);
+export const widevinePsshData = (keyIds) => {
+  const list = Array.isArray(keyIds) ? keyIds : [keyIds];
+
+  return concat(
+    // algorithm = AESCTR
+    [0x08, 0x01],
+    // provider
+    [0x1a, 0x07], ascii('testing'),
+    // key_id
+    ...list.map((keyId) => concat([0x12, 0x10], keyId)),
+    // content_id
+    [0x22, 0x10], list[0]
+  );
+};
 
 /**
  * Build a PSSH box.
@@ -112,16 +114,18 @@ export const playReadyKid = (keyId) => toBase64(concat(
 /**
  * Build a PlayReady Header XML string.
  *
- * @param {string} kid the base64 KID
+ * @param {string|string[]} kids one base64 KID, or several for a
+ *        `<KIDS>` list (version 4.1+ only)
  * @param {string} [version] `4.0.0.0` for a `<KID>` element, otherwise a
  *        `<KID VALUE="...">` attribute is used
  * @return {string} the header XML
  */
-export const playReadyHeader = (kid, version = '4.0.0.0') => {
+export const playReadyHeader = (kids, version = '4.0.0.0') => {
   const xmlns = 'http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader';
+  const kidValues = [].concat(kids).map((kid) => `<KID ALGID="AESCBC" VALUE="${kid}"></KID>`).join('');
   const protectInfo = version === '4.0.0.0' ?
-    `<PROTECTINFO><KEYLEN>16</KEYLEN><ALGID>AESCTR</ALGID></PROTECTINFO><KID>${kid}</KID>` :
-    `<PROTECTINFO><KIDS><KID ALGID="AESCBC" VALUE="${kid}"></KID></KIDS></PROTECTINFO>`;
+    `<PROTECTINFO><KEYLEN>16</KEYLEN><ALGID>AESCTR</ALGID></PROTECTINFO><KID>${kids}</KID>` :
+    `<PROTECTINFO><KIDS>${kidValues}</KIDS></PROTECTINFO>`;
 
   return `<WRMHEADER xmlns="${xmlns}" version="${version}"><DATA>${protectInfo}</DATA></WRMHEADER>`;
 };

@@ -499,6 +499,54 @@ QUnit.module('m3u8s', function(hooks) {
     assert.notOk(this.parser.manifest.contentProtection, 'contentProtection not added');
   });
 
+  QUnit.test('#EXT-X-KEY uses the first of several KIDs in PSSH data and warns', function(assert) {
+    const first = generateKey();
+    const second = generateKey();
+    const warnings = [];
+    const pssh = psshBox({ systemId: WIDEVINE_SYSTEM_ID, keyIds: [first.keyId, second.keyId] });
+    const manifest = [
+      '#EXTM3U',
+      `#EXT-X-KEY:METHOD=SAMPLE-AES,KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed",KEYFORMATVERSIONS="1",URI="data:text/plain;base64,${toBase64(pssh)}",IV=0x${first.ivHex}`,
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.on('warn', (warning) => warnings.push(warning.message));
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.equal(
+      this.parser.manifest.contentProtection['com.widevine.alpha'].attributes.keyId,
+      first.keyIdHex,
+      'first KID used'
+    );
+    assert.deepEqual(
+      warnings,
+      [`multiple key IDs found in PSSH data for com.widevine.alpha, using the first: ${first.keyIdHex}, ${second.keyIdHex}`],
+      'warning lists the KIDs'
+    );
+  });
+
+  QUnit.test('#EXT-X-KEY with a single KID in PSSH data does not warn', function(assert) {
+    const { keyId, ivHex } = generateKey();
+    const warnings = [];
+    const pssh = psshBox({ systemId: WIDEVINE_SYSTEM_ID, data: widevinePsshData(keyId) });
+    const manifest = [
+      '#EXTM3U',
+      `#EXT-X-KEY:METHOD=SAMPLE-AES,KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed",KEYFORMATVERSIONS="1",URI="data:text/plain;base64,${toBase64(pssh)}",IV=0x${ivHex}`,
+      '#EXTINF:5,',
+      'ex1.ts',
+      '#EXT-X-ENDLIST'
+    ].join('\n');
+
+    this.parser.on('warn', (warning) => warnings.push(warning.message));
+    this.parser.push(manifest);
+    this.parser.end();
+
+    assert.deepEqual(warnings, [], 'no warning');
+  });
+
   QUnit.test('#EXT-X-KEY KEYID attribute takes precedence over PSSH data and is uppercased', function(assert) {
     const psshKey = generateKey();
     const { keyIdHex, ivHex } = generateKey();

@@ -5,7 +5,7 @@ import Stream from '@videojs/vhs-utils/es/stream.js';
 import decodeB64ToUint8Array from '@videojs/vhs-utils/es/decode-b64-to-uint8-array.js';
 import LineStream from './line-stream';
 import ParseStream from './parse-stream';
-import { getKeyIdFromPssh } from './pssh';
+import { getKeyIdsFromPssh } from './pssh';
 
 const camelCase = (str) => str
   .toLowerCase()
@@ -326,9 +326,15 @@ export default class Parser extends Stream {
                 }
 
                 if (!keyID) {
-                  const psshKeyId = getKeyIdFromPssh(pssh, protectionSystem);
+                  const psshKeyIds = getKeyIdsFromPssh(pssh, protectionSystem);
 
-                  keyID = psshKeyId && '0x' + psshKeyId;
+                  if (psshKeyIds.length > 1) {
+                    this.trigger('warn', {
+                      message: `multiple key IDs found in PSSH data for ${protectionSystem}, using the first: ${psshKeyIds.join(', ')}`
+                    });
+                  }
+
+                  keyID = psshKeyIds.length ? '0x' + psshKeyIds[0] : undefined;
                 }
 
                 if (!(keyID && keyID.substring(0, 2) === '0x')) {
